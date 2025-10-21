@@ -37,7 +37,8 @@ onMounted(() => {
   })
 })
 const getCommentMusicFn = async (id: number, page: number) => {
-  const { data, code } = await getCommentMusic(id, 0, page, 20, 2)
+  const res = await getCommentMusic(id, 0, page, 20, 2)
+  const { data, code } = res as { data: any; code: number }
   if (code === 200) {
     state.comments = data.comments
     state.total = data.totalCount

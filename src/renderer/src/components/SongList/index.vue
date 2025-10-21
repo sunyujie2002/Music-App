@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {defineComponent, h, nextTick, ref, watch} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {animation, lookup} from '@/utils'
+import { defineComponent, h, nextTick, ref, watch, onMounted, watchEffect } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { animation, lookup } from '@/utils'
 import { GetMusicDetailData, PlayList } from '@/api/musicList'
 import { useUserInfo } from '@/store'
 import useMusic from '@/components/MusicPlayer/useMusic'
@@ -69,6 +69,21 @@ const id = ref(0)
 const filterList = ref(props.list)
 const copyrightVisible = ref(false)
 const searchKeyword = ref('')
+const isPlay = ref(false)
+
+// 监听window.$audio.isPlay的变化
+watchEffect(() => {
+  if (window?.$audio) {
+    isPlay.value = window.$audio.isPlay
+  }
+})
+
+// 组件挂载后立即检查一次
+onMounted(() => {
+  if (window?.$audio) {
+    isPlay.value = window.$audio.isPlay
+  }
+})
 
 const formatCount = (index: number) => {
   return index.toString().length > 1 ? index : '0' + index
@@ -91,19 +106,26 @@ const handlePlaylistMenuSelect = (item: { label: string; value: string }, row, i
       break
   }
 }
-
+const mouseHandler = (item: GetMusicDetailData, type: string) => {
+  if (type === 'enter') {
+    (item as any).isEnter = true
+  } else if (type === 'leave') {
+    (item as any).isEnter = false
+  }
+}
 const playHandler = async (item: GetMusicDetailData, index: number) => {
   const { success } = await checkMusic(item.id)
+  console.log(success)
   if (success === false) {
     copyrightVisible.value = true
     return
   }
 
-  if (music.state.runtimeList?.id === music.state.currentItem?.id) {
-    if (window.$audio.isPlay && props.songs.id === item.id) {
+  if (window.$audio && music.state.runtimeList?.id === music.state.currentItem?.id) {
+    if (isPlay.value && props.songs.id === item.id) {
       return
     }
-    if (!window.$audio.isPlay && props.songs.id === item.id) {
+    if (!isPlay.value && props.songs.id === item.id) {
       return window.$audio.play()
     }
   }
@@ -117,6 +139,13 @@ const playHandler = async (item: GetMusicDetailData, index: number) => {
     props.listInfo
   ) {
     music.updateRuntimeList({ tracks: props.list, ...props.listInfo }, props.ids)
+  }
+}
+
+const pauseHandler = async (item: GetMusicDetailData) => {
+  // 检查当前音乐是否与要暂停的音乐相同
+  if (window.$audio && props.songs.id === item.id && isPlay.value) {
+    return window.$audio.pause()
   }
 }
 
@@ -179,7 +208,7 @@ const setItemRef = (el: any, id: number) => {
   }
 }
 watch(() => props.loading, async (value) => {
-  if(!value && route.query.position && music.state.searchList.length > 0) {
+  if (!value && route.query.position && music.state.searchList.length > 0) {
     const target = music.state.searchList.find(item => props.list.find(listItem => item.id === listItem.id))
     console.log('target', target)
 
@@ -195,8 +224,8 @@ watch(() => props.loading, async (value) => {
           })
           targetEl.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'
           targetEl.animate([
-            {backgroundColor: 'rgba(255, 255, 255, 0.06)'},
-            {backgroundColor: 'rgba(255, 255, 255, 0)'}
+            { backgroundColor: 'rgba(255, 255, 255, 0.06)' },
+            { backgroundColor: 'rgba(255, 255, 255, 0)' }
           ], {
             duration: 1300,
             easing: "ease-in-out",
@@ -221,49 +250,23 @@ watch(
 </script>
 
 <template>
-  <div
-    class="song-list-container"
-    :style="{ overflowY: scroll ? 'auto' : 'visible' }"
-  >
+  <div class="song-list-container" :style="{ overflowY: scroll ? 'auto' : 'visible' }">
     <!-- 搜索框 -->
-    <div
-      v-if="isSearch"
-      class="search-container"
-      :style="{ display: loading ? 'none' : '' }"
-    >
-      <VTextField
-        density="compact"
-        placeholder="搜索此列表歌曲"
-        prepend-inner-icon="mdi-magnify"
-        variant="outlined"
-        :max-width="400"
-        base-color="#ffffff33"
-        color="#ffffff33"
-        v-model="searchKeyword"
-        @update:modelValue="handleSearch"
-      />
+    <div v-if="isSearch" class="search-container" :style="{ display: loading ? 'none' : '' }">
+      <VTextField density="compact" placeholder="搜索此列表歌曲" prepend-inner-icon="mdi-magnify" variant="outlined"
+        :max-width="400" base-color="#ffffff33" color="#ffffff33" v-model="searchKeyword"
+        @update:modelValue="handleSearch" />
     </div>
 
     <!-- 版权提示对话框 -->
-    <VDialog
-      v-model="copyrightVisible"
-      scrim
-      :max-width="400"
-    >
+    <VDialog v-model="copyrightVisible" scrim :max-width="400">
       <VCard rounded="lg">
         <VCardTitle class="d-flex justify-space-between align-center">
           <div class="text-h5 text-medium-emphasis ps-2">当前歌曲暂无音源</div>
-          <VBtn
-            icon="mdi-close"
-            variant="text"
-            @click="closeCopyrightVisible"
-          />
+          <VBtn icon="mdi-close" variant="text" @click="closeCopyrightVisible" />
         </VCardTitle>
         <VCardText class="d-flex justify-center align-center">
-          <VBtn
-            variant="tonal"
-            @click="closeCopyrightVisible"
-          >
+          <VBtn variant="tonal" @click="closeCopyrightVisible">
             好
           </VBtn>
         </VCardText>
@@ -273,88 +276,66 @@ watch(
     <!-- 主要内容 -->
     <template v-if="loading || filterList.length">
       <!-- 标题行 -->
-      <div
-        v-if="isNeedTitle"
-        class="title-container"
-        :style="{ display: loading ? 'none' : '' }"
-      >
-        <div
-          v-for="config in columns"
-          v-show="!config.hidden"
-          :key="config.title"
-          class="title-item"
-          :class="config.class"
-          :style="{ ...config.style, width: config.width }"
-        >
+      <div v-if="isNeedTitle" class="title-container" :style="{ display: loading ? 'none' : '' }">
+        <div v-for="config in columns" v-show="!config.hidden" :key="config.title" class="title-item"
+          :class="config.class" :style="{ ...config.style, width: config.width }">
           {{ config.title }}
         </div>
       </div>
 
       <!-- 歌曲列表 -->
-      <div
-        class="list-container"
-        :style="{ display: loading ? 'none' : '' }"
-      >
-        <ContextMenu
-          v-for="(data, i) in filterList"
-          :key="data.id"
-          :items="playlistMenuItems"
-          @select="(e) => handlePlaylistMenuSelect(e, data, i)"
-        >
-          <div
-            class="list"
-            :ref="(el) => setItemRef(el, data.id)"
-            :class="{ 'disable-list': data.copyright === 0 }"
-            @dblclick="() => playHandler(data, i)"
-            @mousedown="() => mousedownHandler(data)"
-          >
-            <div
-              v-for="config in columns"
-              v-show="!config.hidden"
-              :key="config.prop || config.type"
-              class="item"
-              :class="config.class"
-              :style="{ ...config.style, width: config.width }"
-            >
+      <div class="list-container" :style="{ display: loading ? 'none' : '' }">
+        <ContextMenu v-for="(data, i) in filterList" :key="data.id" :items="playlistMenuItems"
+          @select="(e) => handlePlaylistMenuSelect(e, data, i)">
+          <div class="list" :style="{ backgroundColor: activeText(data) ? 'rgba(255, 255, 255, 0.06)' : '' }"
+            :ref="(el) => setItemRef(el, data.id)" :class="{ 'disable-list': data.copyright === 0 }"
+            @dblclick="() => playHandler(data, i)" @mouseenter="() => mouseHandler(data, 'enter')"
+            @mouseleave="() => mouseHandler(data, 'leave')" @mousedown="() => mousedownHandler(data)">
+            <div v-for="config in columns" v-show="!config.hidden" :key="config.prop || config.type" class="item"
+              :class="config.class" :style="{ ...config.style, width: config.width }">
               <template v-if="config.processEl">
                 <!-- 自定义处理元素 -->
                 <component :is="h('div', config.processEl(h, data, i))" />
               </template>
               <template v-else-if="config.icon">
                 <!-- 图标处理 -->
-                <i
-                  v-for="val in config.icon"
-                  :key="val"
-                  class="iconfont"
-                  :class="{
-                    'icon-xihuan1': val === 'love' && isLike(data),
-                    'icon-xihuan': val === 'love' && !isLike(data)
-                  }"
-                  @click="val === 'love' && likeMusic(data.id, !isLike(data))"
-                />
+                <i v-for="val in config.icon" :key="val" class="iconfont" :class="{
+                  'icon-xihuan1': val === 'love' && isLike(data),
+                  'icon-xihuan': val === 'love' && !isLike(data)
+                }" @click="val === 'love' && likeMusic(data.id, !isLike(data))" />
               </template>
               <template v-else-if="!config.type && config.prop">
                 <!-- 普通属性 -->
                 {{ lookup(data, config.prop) }}
               </template>
               <template v-else-if="config.type === 'index'">
-                <!-- 索引 -->
-                {{
-                  formatCount(
-                    isPaging ? pageSize * (currentPage - 1) + (i + 1) : i + 1
-                  )
-                }}
+                <template v-if="(data as any).isEnter">
+                  <i v-if="isPlay && props.songs.id === data.id" class="iconfont operation icon-Pause pointer"
+                    @click="() => pauseHandler(data)"></i>
+                  <i v-else @click="() => playHandler(data, i)" class="iconfont operation icon-kaishi1 pointer"></i>
+                </template>
+                <template v-else-if="activeText(data)">
+                  <div v-if="isPlay" class="wave">
+                    <div class="wave-bar wave-bar-1"></div>
+                    <div class="wave-bar wave-bar-2"></div>
+                    <div class="wave-bar wave-bar-3"></div>
+                  </div>
+                  <i v-else @click="() => playHandler(data, i)" class="iconfont operation icon-kaishi1"
+                    style="cursor: pointer;"></i>
+                </template>
+                <span v-else>
+                  {{
+                    formatCount(
+                      isPaging ? pageSize * (currentPage - 1) + (i + 1) : i + 1
+                    )
+                  }}
+                </span>
               </template>
               <template v-else-if="config.type === 'title'">
                 <!-- 歌曲标题 -->
                 <div class="title-box">
-                  <VImg
-                    style="max-width: 50px"
-                    width="50"
-                    aspect-ratio="1/1"
-                    :src="lookup(data, config.picUrl) + '?param=150y150'"
-                    class="pic-url"
-                  />
+                  <VImg style="max-width: 50px" width="50" aspect-ratio="1/1"
+                    :src="lookup(data, config.picUrl) + '?param=150y150'" class="pic-url" />
                   <div class="name-box">
                     <div :style="{ color: activeText(data) ? 'rgb(255,60,60)' : '' }">
                       {{ lookup(data, config.prop) }}
@@ -364,20 +345,12 @@ watch(
                         {{ data.artist }}
                       </template>
                       <template v-else>
-                        <span
-                          v-for="(ar, index) in data.ar"
-                          :key="ar.id || index"
-                          :style="{
-                            cursor: ar.id ? 'pointer' : 'default',
-                            color: ar.id ? '' : 'rgba(150, 150, 150, 0.60)'
-                          }"
-                          @click="ar.id && singerDetail(ar.id)"
-                        >
+                        <span v-for="(ar, index) in data.ar" :key="ar.id || index" :style="{
+                          cursor: ar.id ? 'pointer' : 'default',
+                          color: ar.id ? '' : 'rgba(150, 150, 150, 0.60)'
+                        }" @click="ar.id && singerDetail(ar.id)">
                           {{ ar.name || data.artist || '未知艺人' }}
-                          <span
-                            v-if="index < data.ar.length - 1"
-                            style="color: #969696"
-                          > / </span>
+                          <span v-if="index < data.ar.length - 1" style="color: #969696"> / </span>
                         </span>
                       </template>
                     </div>
@@ -395,70 +368,60 @@ watch(
     </template>
 
     <!-- 空状态 -->
-    <div
-      v-else
-      style="display: grid; place-items: center; gap: 20px"
-    >
+    <div v-else style="display: grid; place-items: center; gap: 20px">
       <div style="font-size: 20px">
         没有找到关于"{{ searchKeyword }}"的任何内容
       </div>
-      <VImg
-        :src="NotFound"
-        width="150"
-      />
+      <VImg :src="NotFound" width="150" />
     </div>
 
     <!-- 分页 -->
-    <Pagination
-      v-if="isPaging && total"
-      background
-      :total="total"
-      :page-size="pageSize"
-      :current-page="currentPage"
-      @current-change="(page) => $emit('current-change', page)"
-    />
+    <Pagination v-if="isPaging && total" background :total="total" :page-size="pageSize" :current-page="currentPage"
+      @current-change="(page) => $emit('current-change', page)" />
 
     <!-- 加载状态 -->
-    <div
-      class="loading"
-      :style="{ display: loading ? 'block' : 'none' }"
-      v-loading="loading"
-    />
+    <div class="loading" :style="{ display: loading ? 'block' : 'none' }" v-loading="loading" />
   </div>
 </template>
 
 <style lang="less" scoped>
-.position-target {
-}
+.position-target {}
+
 /* 保留原有的样式不变 */
 .song-list-container {
   flex: 1;
   position: relative;
   padding: 35px;
+
   .search-container {
     display: flex;
     justify-content: start;
   }
+
   .loading {
     position: relative;
     top: 100px;
+
     :deep(.el-loading-mask) {
-      .el-loading-spinner {
-      }
+      .el-loading-spinner {}
     }
   }
+
   .title-item.empty {
     position: relative;
     top: 2px;
     left: 2px;
   }
+
   .empty {
     width: 50px;
   }
+
   .handle {
     width: 45px;
     margin-right: 20px;
   }
+
   .title {
     width: 40%;
     color: @text;
@@ -471,9 +434,11 @@ watch(
     .textOverflow();
     margin-right: 20% - 19px;
   }
+
   .time {
     width: 10%;
   }
+
   .title-container {
     display: flex;
     font-size: 14px;
@@ -481,16 +446,20 @@ watch(
     color: @darkText;
     padding: 0 20px;
     justify-content: space-around;
+
     .title-item {
       text-align: left;
     }
+
     .title-item.title {
       color: @darkText;
     }
   }
+
   .list.disable-list {
     //background-color: rgba(0, 0, 0, 0.3);
   }
+
   .list {
     justify-content: space-around;
     font-size: 14px;
@@ -500,8 +469,14 @@ watch(
     align-items: center;
     padding: 0 20px;
     border-radius: 10px;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.06) !important;
+    }
+
     .title-box {
       display: flex;
+
       .pic-url {
         height: 50px;
         width: 50px;
@@ -509,51 +484,151 @@ watch(
         margin-right: 10px;
         flex-shrink: 0;
       }
+
       .name-box {
         display: flex;
         flex-direction: column;
         justify-content: space-around;
+
         .name-container {
           color: @text;
         }
+
         .title {
           color: @text;
         }
-        > div {
+
+        >div {
           .textOverflow();
         }
+
         .name {
           font-size: 13px;
           color: @darkText;
         }
       }
     }
+
     .name {
       cursor: pointer;
+
       &:hover {
         color: @text !important;
       }
     }
-    .item {
-      text-align: left;
-    }
-    .handle {
-      font-size: 18px;
-      cursor: pointer;
-      .icon-xihuan1 {
-        font-size: 18px;
-        color: #eb4141;
-        margin-left: 4px;
-      }
-      .icon-xihuan {
-        color: #a5a7a8;
-        font-size: 19px;
-        margin-left: 4px;
-      }
+  }
+
+  .wave {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 20px;
+    height: 16px;
+    gap: 2px;
+
+    .wave-bar {
+      width: 3px;
+      background-color: rgb(255, 60, 60);
+      border-radius: 1px;
+      animation-duration: 1s;
+      animation-iteration-count: infinite;
+      animation-timing-function: ease-in-out;
     }
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.06) !important;
+    .wave-bar-1 {
+      animation-name: wave-animation-1;
+      animation-delay: 0s;
+    }
+
+    .wave-bar-2 {
+      animation-name: wave-animation-2;
+      animation-delay: 0.2s;
+    }
+
+    .wave-bar-3 {
+      animation-name: wave-animation-3;
+      animation-delay: 0.4s;
+    }
+  }
+
+  @keyframes wave-animation-1 {
+
+    0%,
+    100% {
+      height: 4px;
+    }
+
+    25% {
+      height: 12px;
+    }
+
+    50% {
+      height: 8px;
+    }
+
+    75% {
+      height: 16px;
+    }
+  }
+
+  @keyframes wave-animation-2 {
+
+    0%,
+    100% {
+      height: 8px;
+    }
+
+    25% {
+      height: 16px;
+    }
+
+    50% {
+      height: 4px;
+    }
+
+    75% {
+      height: 12px;
+    }
+  }
+
+  @keyframes wave-animation-3 {
+
+    0%,
+    100% {
+      height: 12px;
+    }
+
+    25% {
+      height: 4px;
+    }
+
+    50% {
+      height: 16px;
+    }
+
+    75% {
+      height: 8px;
+    }
+  }
+
+  .item {
+    text-align: left;
+  }
+
+  .handle {
+    font-size: 18px;
+    cursor: pointer;
+
+    .icon-xihuan1 {
+      font-size: 18px;
+      color: #eb4141;
+      margin-left: 4px;
+    }
+
+    .icon-xihuan {
+      color: #a5a7a8;
+      font-size: 19px;
+      margin-left: 4px;
     }
   }
 }
