@@ -204,7 +204,7 @@ watch(
           padding-right: 35px;
           .content-line {
             display: flex;
-            align-items: center;
+            align-items: top;
             position: relative;
             padding-bottom: 25px;
             width: 100%;
@@ -237,10 +237,11 @@ watch(
                 display: flex;
                 font-size: 13px;
                 margin-bottom: 6px;
+                flex-direction: column;
                 .name {
                   color: #0086b3;
                   cursor: pointer;
-                  margin-right: 5px;
+                  margin-bottom: 5px;
                 }
                 .text {
                 }

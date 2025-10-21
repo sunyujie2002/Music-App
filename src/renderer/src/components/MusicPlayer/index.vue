@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, reactive, UnwrapRef, watch } from 'vue'
+import { ref, onMounted, reactive, UnwrapRef, watch, computed, nextTick } from 'vue'
 import { useUserInfo } from '@/store'
 import { useMusicAction } from '@/store/music'
 import ProgressBar from '@/components/MusicPlayer/ProgressBar.vue'
@@ -44,6 +44,14 @@ const audio = ref<userAudio>()
 const music = useMusicAction()
 const flags = useFlags()
 const transitionIsPlay = ref(false)
+
+// 动态设置CSS变量到文档根元素
+const updateLyricColors = () => {
+  const color1 = music.state.bgColor?.[1] || [255, 255, 255]
+  const color2 = music.state.bgColor?.[0] || [255, 255, 255]
+  document.documentElement.style.setProperty('--lyric-color-1', `rgb(${color1.join(',')})`)
+  document.documentElement.style.setProperty('--lyric-color-2', `rgb(${color2.join(',')})`)
+}
 const { addListener, executeListener, pauseSomethingListener } = useListener(audio)
 const { getPlayListDetailFn } = usePlayList()
 const player = new Player({
@@ -72,6 +80,9 @@ onMounted(() => {
     if (event.target.error.code === 4) {
     }
   })
+  
+  // 初始化时设置颜色
+  updateLyricColors()
 })
 function play(lengthen: boolean = false) {
   let volume = store.volume
@@ -91,7 +102,7 @@ function play(lengthen: boolean = false) {
 
   // 开始时直接改变就可以，让逐字歌词跟得上
   transitionIsPlay.value = true
-  return transitionVolume(volume, true, lengthen).then(() => {})
+  return transitionVolume(volume, true, lengthen).then(() => { })
 }
 function pause(isNeed: boolean = true, lengthen: boolean = false) {
   let volume = store.volume
@@ -190,6 +201,11 @@ const cutSongHandler = () => {
   const type = music.state.lrcMode === 1 ? 'lrc' : 'yrc'
   player.updateAudioLrc(music.state.lyric, type)
   executeListener('cutSong')
+  
+  // 切换歌曲时更新颜色
+  nextTick(() => {
+    updateLyricColors()
+  })
 }
 
 const exposeObj = {
@@ -224,25 +240,11 @@ defineExpose(exposeObj)
 
 <template>
   <div class="bottom-container">
-    <audio
-      @timeupdate="timeupdate"
-      @ended="end"
-      @seeked="seeked"
-      ref="audio"
-      class="plyr-audio"
-      :src="props.src"
-      preload="auto"
-    />
+    <audio @timeupdate="timeupdate" @ended="end" @seeked="seeked" ref="audio" class="plyr-audio" :src="props.src"
+      preload="auto" />
     <DetailLeft :songs="props.songs" />
-    <DetailCenter
-      :orderStatus="orderStatus"
-      :isPlay="isPlay"
-      :orderStatusVal="music.state.orderStatusVal"
-      @play="play"
-      @pause="pause"
-      @cutSong="(val) => emit('cutSong', val)"
-      @setOrderHandler="setOrderHandler"
-    />
+    <DetailCenter :orderStatus="orderStatus" :isPlay="isPlay" :orderStatusVal="music.state.orderStatusVal" @play="play"
+      @pause="pause" @cutSong="(val) => emit('cutSong', val)" @setOrderHandler="setOrderHandler" />
     <DetailRight :currentTime="music.state.currentTime" :songs="props.songs" :audio="audio" />
   </div>
   <div class="plan-container">
@@ -251,6 +253,13 @@ defineExpose(exposeObj)
 </template>
 
 <style lang="less">
+.y-player-container .y-player-scroll .y-player-item .y-text {
+  background: rgba(255, 255, 255, 0.3) -webkit-linear-gradient(left, var(--lyric-color-1), var(--lyric-color-1)) no-repeat 0 0;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 0% 100%;
+}
+
 .plan-container {
   display: flex;
   align-items: center;
@@ -259,6 +268,7 @@ defineExpose(exposeObj)
   top: -8.5px;
   width: 100%;
 }
+
 .el-overlay {
   .music-drawer {
     background-image: url('../../assets/defaultBg.png');
@@ -270,6 +280,7 @@ defineExpose(exposeObj)
 :deep(.el-drawer) {
   height: 100%;
 }
+
 .bottom-container {
   display: flex;
   justify-content: space-between;
