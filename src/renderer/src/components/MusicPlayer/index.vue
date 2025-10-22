@@ -254,10 +254,11 @@ defineExpose(exposeObj)
 
 <style lang="less">
 .y-player-container .y-player-scroll .y-player-item .y-text {
-  background: rgba(255, 255, 255, 0.3) -webkit-linear-gradient(left, var(--lyric-color-1), var(--lyric-color-1)) no-repeat 0 0;
+  background: rgba(255, 255, 255, 0.3) -webkit-linear-gradient(left, var(--lyric-color-2), var(--lyric-color-2)) no-repeat 0 0;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-size: 0% 100%;
+  font-size: 20px;
 }
 
 .plan-container {

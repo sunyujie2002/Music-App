@@ -64,7 +64,7 @@ nextTick(() => {
           // 在动画开始时设置背景图片
           onStart: () => {
             if (!props.videoPlayUrl) {
-              ;(coverEl as HTMLDivElement).style.backgroundImage = `url(${img.src})`
+              ; (coverEl as HTMLDivElement).style.backgroundImage = `url(${img.src})`
             }
           }
         })
@@ -85,12 +85,14 @@ const arNames = computed(() => {
 <template>
   <div :style="{ 'backdrop-filter': isBlur ? 'blur(0px)' : 'none' }" class="shadow">
     <div class="lyric-and-bg-container">
-      <div
-        class="cover-container"
-        :style="{ transform: props.lyric.length ? '' : 'translateX(0)' }"
-      >
-        <div
-          @click="
+      <div class="cover-container" :style="{ transform: props.lyric.length ? '' : 'translateX(0)' }">
+        <video ref="videoCover" class="video-cover" autoplay loop muted v-show="props.videoPlayUrl"
+          :src="props.videoPlayUrl"></video>
+        <div v-show="!props.videoPlayUrl" class="img-cover" />
+      </div>
+      <div class="right-container">
+        <div style="padding-left: 60px;" class="title-container">
+          <div @click="
             () => {
               flash.isOpenDetail = false
               router.push({
@@ -100,27 +102,26 @@ const arNames = computed(() => {
                 }
               })
             }
-          "
-          class="title"
-        >
-          {{ props.title }} -
-          <span v-for="(item, index) in props.ar"
-            >{{ item.name }} <span v-if="props.ar.length - 1 !== index">/</span></span
-          >
+          " class="title">
+            {{ props.title }}
+          </div>
+          <div class="ar-detail">
+            <span v-for="(item, index) in props.ar">
+              <span class="ar-item" @click="() => {
+                flash.isOpenDetail = false
+                router.push({
+                  path: `/search`,
+                  query: {
+                    key: item.name
+                  }
+                })
+              }">{{ item.name }} </span>
+              <span style="margin: 0px 3px;" v-if="props.ar.length - 1 !== index">/</span>
+            </span>
+          </div>
         </div>
-        <video
-          ref="videoCover"
-          class="video-cover"
-          autoplay
-          loop
-          muted
-          v-show="props.videoPlayUrl"
-          :src="props.videoPlayUrl"
-        ></video>
-        <div v-show="!props.videoPlayUrl" class="img-cover" />
+        <div class="lyric-container" v-show="props.lyric.length"></div>
       </div>
-
-      <div class="lyric-container" v-show="props.lyric.length"></div>
     </div>
   </div>
 </template>
@@ -134,6 +135,7 @@ const arNames = computed(() => {
   width: 100%;
   height: 100%;
   background-color: rgba(0, 0, 0, 0.5);
+
   .lyric-and-bg-container {
     display: flex;
     margin-top: 17vh;
@@ -141,44 +143,77 @@ const arNames = computed(() => {
     align-items: center;
     height: 58vh;
     transition: 1s;
+
     .cover-container {
       width: 45vh;
       transform-origin: center;
       transition: 0.8s;
     }
-    .title {
-      font-size: 25px;
-      font-weight: 500;
-      width: 100%;
-      cursor: pointer;
-      .textOverflow(1);
+
+    .right-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 40vw;
+
+      .title-container {
+        margin-bottom: 20px;
+
+        .title {
+          font-size: 25px;
+          font-weight: 500;
+          width: 100%;
+          cursor: pointer;
+          .textOverflow(1);
+
+          &:hover {
+            color: white;
+          }
+        }
+
+        .ar-detail {
+          font-size: 15px;
+          font-weight: 400;
+          width: 100%;
+          .textOverflow(1);
+
+          .ar-item {
+            cursor: pointer;
+
+            &:hover {
+              color: white;
+            }
+          }
+        }
+      }
+
+      .lyric-container {
+        height: 100%;
+        width: 40vw;
+        border-radius: 5px;
+        overflow: auto;
+        mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+        -webkit-mask-image: linear-gradient(to bottom,
+            transparent,
+            black 10%,
+            black 90%,
+            transparent);
+        position: relative;
+      }
     }
+
     .video-cover {
       height: 100%;
       width: 100%;
       border-radius: 5px;
     }
+
     .img-cover {
       height: 100%;
       width: 100%;
       border-radius: 5px;
       transition: 0.8s;
       .bgSetting();
-    }
-    .lyric-container {
-      height: 100%;
-      width: 40vw;
-      border-radius: 5px;
-      overflow: auto;
-      mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
-      -webkit-mask-image: linear-gradient(
-        to bottom,
-        transparent,
-        black 10%,
-        black 90%,
-        transparent
-      );
-      position: relative;
     }
   }
 }

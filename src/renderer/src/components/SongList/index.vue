@@ -160,8 +160,6 @@ const isLike = (item: GetMusicDetailData) => {
 const activeText = (item: GetMusicDetailData) => {
   if (item.id === undefined) {
     return false
-  } else if (props.listInfo) {
-    return item.id === props.songs.id && props.listInfo.id === music.state.runtimeList?.id
   } else {
     return item.id === props.songs.id
   }
@@ -616,7 +614,6 @@ watch(
   }
 
   .handle {
-    font-size: 18px;
     cursor: pointer;
 
     .icon-xihuan1 {
